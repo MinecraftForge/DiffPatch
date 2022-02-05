@@ -1,19 +1,9 @@
-buildscript {
-    repositories {
-        mavenCentral()
-        maven { url = 'https://maven.minecraftforge.net/' }
-    }
-    dependencies {
-        classpath  group: 'net.minecraftforge.gradleutils', name: 'GradleUtils', version: '2.+'
-    }
-}
-
 plugins {
     id 'java'
     id 'maven-publish'
+    id 'net.minecraftforge.gradleutils' version '2.+'
     id 'com.github.johnrengelman.shadow' version '5.2.0'
 }
-apply plugin: 'net.minecraftforge.gradleutils'
 
 group 'net.minecraftforge'
 archivesBaseName = 'DiffPatch'
