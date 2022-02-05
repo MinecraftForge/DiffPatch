@@ -1,9 +1,10 @@
 buildscript {
     repositories {
         mavenCentral()
+        maven { url = 'https://maven.minecraftforge.net/' }
     }
     dependencies {
-        classpath 'org.eclipse.jgit:org.eclipse.jgit:5.10.0.202012080955-r'
+        classpath  group: 'net.minecraftforge.gradleutils', name: 'GradleUtils', version: '2.+'
     }
 }
 
@@ -12,66 +13,20 @@ plugins {
     id 'maven-publish'
     id 'com.github.johnrengelman.shadow' version '5.2.0'
 }
+apply plugin: 'net.minecraftforge.gradleutils'
 
 group 'net.minecraftforge'
 archivesBaseName = 'DiffPatch'
 
-def gitInfo(dir) {
-    String.metaClass.rsplit = { String del, int limit = -1 ->
-        def lst = new ArrayList()
-        def x = 0, idx
-        def tmp = delegate
-        while ((idx = tmp.lastIndexOf(del)) != -1 && (limit == -1 || x++ < limit)) {
-            lst.add(0, tmp.substring(idx + del.length(), tmp.length()))
-            tmp = tmp.substring(0, idx)
-        }
-        lst.add(0, tmp)
-        return lst
-    }
-    
-    def git = null
-    try {
-        git = org.eclipse.jgit.api.Git.open(dir)
-    } catch (org.eclipse.jgit.errors.RepositoryNotFoundException e) {
-        return [
-            tag: '0.0',
-            offset: '0',
-            hash: '00000000',
-            branch: 'master',
-            commit: '0000000000000000000000',
-            abbreviatedId: '00000000'
-        ]
-    }
-    def desc = git.describe().setLong(true).setTags(true).call().rsplit('-', 2)
-    def head = git.repository.exactRef('HEAD')
-    def longBranch = head.symbolic ? head?.target?.name : null // matches Repository.getFullBranch() but returning null when on a detached HEAD
-
-    def ret = [:]
-    ret.tag = desc[0]
-    ret.offset = desc[1]
-    ret.hash = desc[2]
-    ret.branch = longBranch != null ? org.eclipse.jgit.lib.Repository.shortenRefName(longBranch) : null
-    ret.commit = org.eclipse.jgit.lib.ObjectId.toString(head.objectId)
-    ret.abbreviatedId = head.objectId.abbreviate(8).name()
-    
-    return ret
-}
-
-def gitVersion() {
-    def info = gitInfo(rootProject.file('.'))
-    def branch = info.branch
-    if (branch != null && branch.startsWith('pulls/'))
-        branch = 'pr' + branch.rsplit('/', 1)[1]
-    if (branch in [null, 'master', 'HEAD', '2.0'])
-        return "${info.tag}.${info.offset}".toString()
-    return "${info.tag}.${info.offset}-${branch}".toString()
-}
-
-version = gitVersion()
+version = gradleutils.getTagOffsetVersion()
 println('Version: ' + version + ' Java: ' + System.getProperty('java.version') + ' JVM: ' + System.getProperty('java.vm.version') + '(' + System.getProperty('java.vendor') + ') Arch: ' + System.getProperty('os.arch'))
 
 targetCompatibility = "1.8"
 sourceCompatibility = "1.8"
+
+ext {
+    MIN_CHANGELOG_TAG = '2.0'
+}
 
 repositories {
     mavenLocal()
@@ -151,20 +106,7 @@ task srcJar(type: Jar) {
 
 publishing {
     repositories {
-        maven {
-            if (System.env.MAVEN_USER) {
-                url 'https://maven.minecraftforge.net/'
-                authentication {
-                    basic(BasicAuthentication)
-                }
-                credentials {
-                    username = System.env.MAVEN_USER ?: 'not'
-                    password = System.env.MAVEN_PASSWORD ?: 'set'
-                }
-            } else {
-                url 'file://' + rootProject.file('repo').getAbsolutePath()
-            }
-        }
+        maven gradleutils.getPublishingForgeMaven()
     }
     publications {
         DiffPatch(MavenPublication) {
@@ -212,4 +154,8 @@ publishing {
             }
         }
     }
+}
+
+changelog {
+    fromTag MIN_CHANGELOG_TAG
 }
